@@ -18,6 +18,8 @@ def run_realtime(args: Namespace) -> None:
         calibrate=not args.no_calibrate,
         calibration_seconds=args.calibration_seconds,
         collect=args.collect,
+        serve_dashboard=args.serve_dashboard,
+        dashboard_port=args.dashboard_port,
     )
 
 

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Attention Drift Detector — Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-height: 100vh; padding: 1.5rem; }
+
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+  header h1 { font-size: 1.3rem; font-weight: 700; color: #58a6ff; letter-spacing: -0.5px; }
+  #status-dot { width: 10px; height: 10px; border-radius: 50%; background: #484f58; display: inline-block; margin-right: 6px; transition: background 0.3s; }
+  #status-dot.live { background: #3fb950; box-shadow: 0 0 8px #3fb950; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  #status-label { font-size: 0.8rem; color: #8b949e; }
+
+  .top-row { display: grid; grid-template-columns: auto 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: start; }
+
+  /* State pill */
+  #state-pill { font-size: 2.4rem; font-weight: 800; padding: 0.5rem 2rem; border-radius: 50px; display: inline-block; transition: all 0.4s ease; text-transform: uppercase; letter-spacing: 2px; min-width: 220px; text-align: center; }
+  #state-pill.focused  { background: #0d3522; color: #3fb950; border: 2px solid #3fb950; }
+  #state-pill.drifting { background: #341d00; color: #d29922; border: 2px solid #d29922; }
+  #state-pill.absent   { background: #2d1218; color: #f85149; border: 2px solid #f85149; }
+  #state-pill.idle     { background: #161b22; color: #484f58; border: 2px solid #30363d; }
+
+  /* Stat cards */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+  .stat { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 0.75rem 1rem; }
+  .stat-val { font-size: 1.6rem; font-weight: 700; color: #58a6ff; }
+  .stat-lbl { font-size: 0.7rem; color: #8b949e; margin-top: 3px; }
+  #focus-val.good   { color: #3fb950; }
+  #focus-val.medium { color: #d29922; }
+  #focus-val.poor   { color: #f85149; }
+
+  /* Chart section */
+  .chart-section { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+  .chart-section h2 { font-size: 0.85rem; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem; }
+
+  /* Sessions table */
+  .bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { text-align: left; color: #8b949e; font-weight: 500; padding: 0.4rem 0.5rem; border-bottom: 1px solid #30363d; }
+  td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #21262d; }
+  td.focused  { color: #3fb950; }
+  td.drifting { color: #d29922; }
+  td.poor     { color: #f85149; }
+
+  .footer { font-size: 0.72rem; color: #484f58; text-align: center; margin-top: 1.5rem; }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧠 Attention Drift Detector</h1>
+  <div>
+    <span id="status-dot"></span>
+    <span id="status-label">Waiting for pipeline…</span>
+  </div>
+</header>
+
+<div class="top-row">
+  <div>
+    <div id="state-pill" class="idle">IDLE</div>
+    <div style="font-size:0.75rem;color:#8b949e;margin-top:0.5rem;text-align:center" id="conf-label">—</div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-val" id="focus-val">—</div><div class="stat-lbl">Focus Ratio</div></div>
+    <div class="stat"><div class="stat-val" id="elapsed-val">—</div><div class="stat-lbl">Elapsed</div></div>
+    <div class="stat"><div class="stat-val" id="alerts-val">—</div><div class="stat-lbl">Drift Alerts</div></div>
+    <div class="stat"><div class="stat-val" id="cal-val">—</div><div class="stat-lbl">Calibrated</div></div>
+  </div>
+</div>
+
+<div class="chart-section">
+  <h2>Live Attention Timeline (last 120 s)</h2>
+  <div id="timeline" style="height:180px"></div>
+</div>
+
+<div class="bottom-row">
+  <div class="chart-section">
+    <h2>Session History</h2>
+    <table id="sessions-table">
+      <thead><tr><th>ID</th><th>Started</th><th>Dur</th><th>Focus</th><th>Alerts</th></tr></thead>
+      <tbody id="sessions-body"><tr><td colspan="5" style="color:#484f58">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="chart-section">
+    <h2>14-Day Focus Trend</h2>
+    <div id="trend-chart" style="height:220px"></div>
+  </div>
+</div>
+
+<div class="footer">
+  All data is stored locally and never transmitted · <a href="/docs">API docs</a>
+</div>
+
+<script>
+// ── chart config ──────────────────────────────────────────────────────────────
+const DARK = {
+  paper_bgcolor: "#161b22", plot_bgcolor: "#161b22",
+  font: { color: "#c9d1d9", size: 11 },
+  margin: { t: 5, b: 35, l: 45, r: 10 },
+  xaxis: { gridcolor: "#21262d", linecolor: "#30363d", zeroline: false },
+  yaxis: { gridcolor: "#21262d", linecolor: "#30363d", zeroline: false },
+};
+const CFG = { responsive: true, displayModeBar: false };
+
+// ── timeline (ring buffer, 120 points @ 1s) ───────────────────────────────────
+const MAX_PTS = 120;
+const tlTimes = [], tlVals = [], tlColors = [];
+const STATE_VAL = { focused: 1, drifting: 0.5, absent: 0 };
+const STATE_COLOR = { focused: "#3fb950", drifting: "#d29922", absent: "#f85149" };
+
+Plotly.newPlot("timeline", [{
+  x: tlTimes, y: tlVals, type: "scatter", mode: "lines+markers",
+  line: { color: "#58a6ff", width: 1.5 },
+  marker: { color: tlColors, size: 5 },
+  hovertemplate: "%{x}<br>State: %{text}<extra></extra>",
+  text: [],
+  yaxis: "y",
+}], {
+  ...DARK,
+  yaxis: { ...DARK.yaxis, range: [-0.1, 1.1], tickvals: [0, 0.5, 1], ticktext: ["Absent", "Drifting", "Focused"] },
+}, CFG);
+
+function pushTimeline(state) {
+  const now = new Date().toLocaleTimeString();
+  const val = STATE_VAL[state] ?? 0.5;
+  const col = STATE_COLOR[state] ?? "#58a6ff";
+  tlTimes.push(now); tlVals.push(val); tlColors.push(col);
+  const txt = Plotly.d3.select("#timeline").node().__data__?.[0]?.text ?? [];
+  txt.push(state);
+  if (tlTimes.length > MAX_PTS) { tlTimes.shift(); tlVals.shift(); tlColors.shift(); txt.shift(); }
+  Plotly.update("timeline", { x: [tlTimes], y: [tlVals], "marker.color": [tlColors], text: [txt] }, {}, [0]);
+}
+
+// ── trend chart ───────────────────────────────────────────────────────────────
+Plotly.newPlot("trend-chart", [{
+  x: [], y: [], type: "scatter", mode: "lines+markers",
+  line: { color: "#58a6ff", width: 2 },
+  marker: { color: "#58a6ff", size: 5 },
+  connectgaps: true,
+  hovertemplate: "%{x}<br>Avg Focus: %{y:.1f}%<extra></extra>",
+}], {
+  ...DARK,
+  yaxis: { ...DARK.yaxis, range: [0, 100], title: "Focus %" },
+}, CFG);
+
+async function loadTrend() {
+  try {
+    const sessions = await (await fetch("/api/sessions")).json();
+    // group by date
+    const byDay = {};
+    sessions.forEach(s => {
+      if (!s.started_at || s.focus_ratio == null) return;
+      const d = s.started_at.split("T")[0];
+      (byDay[d] = byDay[d] || []).push(s.focus_ratio * 100);
+    });
+    const days = Object.keys(byDay).sort().slice(-14);
+    const avg = days.map(d => +(byDay[d].reduce((a,b) => a+b,0)/byDay[d].length).toFixed(1));
+    Plotly.update("trend-chart", { x: [days], y: [avg] }, {}, [0]);
+  } catch(e) { /* server not ready */ }
+}
+
+// ── sessions table ────────────────────────────────────────────────────────────
+async function loadSessions() {
+  try {
+    const sessions = await (await fetch("/api/sessions?limit=8")).json();
+    const tbody = document.getElementById("sessions-body");
+    if (!sessions.length) { tbody.innerHTML = '<tr><td colspan="5" style="color:#484f58">No sessions yet</td></tr>'; return; }
+    tbody.innerHTML = sessions.map(s => {
+      const id = (s.session_id || "").slice(0, 8);
+      const started = s.started_at ? new Date(s.started_at).toLocaleString() : "—";
+      const dur = (s.started_at && s.ended_at)
+        ? ((new Date(s.ended_at) - new Date(s.started_at)) / 60000).toFixed(1) + "m"
+        : "—";
+      const focusPct = s.focus_ratio != null ? (s.focus_ratio * 100).toFixed(0) + "%" : "—";
+      const cls = s.focus_ratio > 0.7 ? "focused" : s.focus_ratio > 0.4 ? "drifting" : "poor";
+      return `<tr><td>${id}</td><td>${started}</td><td>${dur}</td><td class="${cls}">${focusPct}</td><td>${s.drift_events ?? "—"}</td></tr>`;
+    }).join("");
+  } catch(e) { /* server not ready */ }
+}
+
+// ── live state polling ────────────────────────────────────────────────────────
+const dot = document.getElementById("status-dot");
+const statusLabel = document.getElementById("status-label");
+const statePill = document.getElementById("state-pill");
+const confLabel = document.getElementById("conf-label");
+const focusVal = document.getElementById("focus-val");
+const elapsedVal = document.getElementById("elapsed-val");
+const alertsVal = document.getElementById("alerts-val");
+const calVal = document.getElementById("cal-val");
+
+let lastState = null;
+
+function fmtElapsed(s) {
+  const m = Math.floor(s / 60), sec = s % 60;
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+async function pollLive() {
+  try {
+    const d = await (await fetch("/api/live")).json();
+    if (d.running) {
+      dot.className = "live";
+      statusLabel.textContent = `Live · session ${(d.session_id || "").slice(0,8)}`;
+
+      const st = d.state || "idle";
+      if (st !== lastState) {
+        statePill.className = "";
+        statePill.classList.add(st);
+        statePill.textContent = st.toUpperCase();
+        lastState = st;
+      }
+      confLabel.textContent = `Confidence: ${((d.confidence || 0) * 100).toFixed(0)}%`;
+
+      const fp = d.focus_ratio ?? 0;
+      focusVal.textContent = fp + "%";
+      focusVal.className = "stat-val " + (fp >= 70 ? "good" : fp >= 40 ? "medium" : "poor");
+
+      elapsedVal.textContent = fmtElapsed(d.elapsed_seconds || 0);
+      alertsVal.textContent = d.drift_alerts ?? 0;
+      calVal.textContent = d.calibrated ? "✓" : "—";
+
+      pushTimeline(st);
+    } else {
+      dot.className = "";
+      statusLabel.textContent = "Pipeline not running";
+      if (statePill.className !== "idle") {
+        statePill.className = "idle";
+        statePill.textContent = "IDLE";
+        lastState = "idle";
+      }
+    }
+  } catch(e) {
+    dot.className = "";
+    statusLabel.textContent = "API server not reachable";
+  }
+}
+
+// ── boot ──────────────────────────────────────────────────────────────────────
+pollLive();
+loadSessions();
+loadTrend();
+
+setInterval(pollLive, 1000);
+setInterval(loadSessions, 10000);
+setInterval(loadTrend, 30000);
+</script>
+</body>
+</html>

@@ -92,6 +92,29 @@ def _draw_overlay(
         cv2.circle(frame, (w - 20, 20), 7, (0, 0, 220), -1)  # red dot
 
 
+def _start_dashboard_server(host: str = "127.0.0.1", port: int = 8765) -> None:
+    """Boot uvicorn in a daemon thread so the pipeline loop stays in main thread."""
+    import threading
+    try:
+        import uvicorn
+    except ImportError:
+        print("[dashboard] uvicorn not installed — run: pip install uvicorn")
+        return
+
+    config = uvicorn.Config(
+        "attention_drift_detector.api.app:app",
+        host=host,
+        port=port,
+        log_level="warning",
+    )
+    server = uvicorn.Server(config)
+    t = threading.Thread(target=server.run, daemon=True)
+    t.start()
+    # Small delay so the server is ready before the first frame
+    import time as _time; _time.sleep(1.2)
+    print(f"[dashboard] http://{host}:{port}/   (Ctrl+C to stop pipeline)")
+
+
 def run_realtime_pipeline(
     user_id: str = "default_user",
     max_seconds: int | None = None,
@@ -102,6 +125,8 @@ def run_realtime_pipeline(
     calibrate: bool = True,
     calibration_seconds: float = 30.0,
     collect: bool = False,
+    serve_dashboard: bool = False,
+    dashboard_port: int = 8765,
 ) -> None:
     """
     Real-time webcam attention loop.
@@ -114,7 +139,11 @@ def run_realtime_pipeline(
     collect:             Save labeled FrameFeatures to CSV for ML training.
     save_session:        Persist session metadata and events to SQLite.
     generate_report:     Write an HTML report after the session ends.
+    serve_dashboard:     Boot the web dashboard in a background thread.
+    dashboard_port:      Port for the dashboard server (default 8765).
     """
+    if serve_dashboard:
+        _start_dashboard_server(port=dashboard_port)
 
     window_frames = int(settings.drift.temporal_window_s * settings.target_fps)
     smoother = TemporalSmoother(window_size=max(1, window_frames))
@@ -173,6 +202,24 @@ def run_realtime_pipeline(
     if calibrate and not use_dummy:
         print(f"[calibrate] Sit naturally, look at your screen — {calibration_seconds:.0f}s calibration window starting...")
 
+    # Live state push helper (no-op when dashboard not running)
+    def _push_live(event: AttentionEvent, elapsed: float, calibrated: bool) -> None:
+        if not serve_dashboard:
+            return
+        try:
+            from ..api.stream import update_live_state
+            update_live_state(
+                session_id=tracker.session_id,
+                state=event.state.value,
+                confidence=event.confidence,
+                focus_ratio=tracker.focus_ratio() * 100,
+                drift_alerts=tracker.drift_alerts,
+                elapsed_seconds=elapsed,
+                calibrated=calibrated,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
     # ── Dummy mode ─────────────────────────────────────────────────────
     if use_dummy:
         while True:
@@ -187,9 +234,10 @@ def run_realtime_pipeline(
             raw_event = classifier.predict(features)
             event = smoother.push(raw_event)
             tracker.record_event(event)
+            elapsed = time.monotonic() - started_monotonic
+            _push_live(event, elapsed, False)
             time.sleep(1.0 / max(1, settings.target_fps))
 
-            elapsed = time.monotonic() - started_monotonic
             if time.monotonic() - last_print >= 1.0:
                 print(
                     f"[{event.timestamp.isoformat()}] "
@@ -258,6 +306,8 @@ def run_realtime_pipeline(
                 if data_collector is not None:
                     data_collector.record(features, event)
 
+                _push_live(event, elapsed, calibrator is not None and calibrator.is_done)
+
                 if event.state == AttentionState.FOCUSED:
                     nudge_system.on_recovery()
 
@@ -287,6 +337,13 @@ def run_realtime_pipeline(
                     break
 
     # ── Cleanup ─────────────────────────────────────────────────────────
+    if serve_dashboard:
+        try:
+            from ..api.stream import clear_live_state
+            clear_live_state()
+        except Exception:  # noqa: BLE001
+            pass
+
     if face_mesh is not None:
         face_mesh.close()
     if preview_enabled:

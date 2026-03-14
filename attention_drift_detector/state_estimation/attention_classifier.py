@@ -8,23 +8,36 @@ from .calibrator import CalibrationResult
 
 class AttentionClassifier:
     """
-    Rule-based classifier with optional personal calibration.
-    Placeholder for an MLP/SVM model with the same interface.
+    Hybrid classifier: uses a trained ML model when available (models_store/attention_model.joblib),
+    otherwise falls back to calibrated rule-based logic.
 
-    Without calibration: uses static thresholds from AppConfig.
-    With calibration: uses per-user adaptive thresholds and corrects
-    for each person's natural resting head pose and gaze offset.
+    ML model is loaded once at construction time. Rule-based fallback supports
+    optional personal calibration for adaptive per-user thresholds.
     """
 
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(self, config: AppConfig, use_ml: bool = True) -> None:
         self._config = config
         self._calibration: CalibrationResult | None = None
+        self._ml_model = None
+        if use_ml:
+            try:
+                from ..models.mlp_classifier import MLAttentionClassifier
+                self._ml_model = MLAttentionClassifier.load()
+                if self._ml_model is not None:
+                    print(f"[classifier] ML model loaded from {self._ml_model.model_path.name}")
+            except Exception:  # noqa: BLE001
+                pass  # silently fall through to rule-based
 
     def apply_calibration(self, result: CalibrationResult) -> None:
         """Hot-swap in personal thresholds mid-session (called after calibration)."""
         self._calibration = result
 
     def predict(self, features: FrameFeatures) -> AttentionEvent:
+        # ── ML path ───────────────────────────────────────────────────────────
+        if self._ml_model is not None:
+            return self._ml_model.predict(features)
+
+        # ── Rule-based path ───────────────────────────────────────────────────
         if features.face_visibility < self._config.face_visibility_threshold:
             return AttentionEvent(
                 timestamp=features.timestamp,

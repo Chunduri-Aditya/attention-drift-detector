@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 SESSIONS_DIR = BASE_DIR / "sessions"
 REPORTS_DIR = BASE_DIR / "reports"
 MODELS_STORE_DIR = BASE_DIR / "models_store"
+MODELS_DIR = MODELS_STORE_DIR  # alias used by ML modules
 
 # Single SQLite database for all sessions (WAL mode, privacy-safe)
 DB_PATH = SESSIONS_DIR / "attention_sessions.db"
