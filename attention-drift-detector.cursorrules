@@ -1,0 +1,103 @@
+# Attention Drift Detector — Cursor Rules
+
+## Project Overview
+A webcam-based attention monitoring tool for deep work and study sessions.
+Detects attention drift (zoning out, visual distraction, mind-wandering) in real time
+using gaze estimation and head pose tracking — no eye-tracking hardware required.
+Designed as a smarter, data-driven alternative to Pomodoro timers.
+
+## Stack
+- Python 3.11+
+- MediaPipe Face Mesh for facial landmark tracking
+- OpenCV for webcam capture and frame processing
+- dlib or L2CS-Net for gaze direction estimation
+- PyTorch for attention state classification
+- SQLite for session storage
+- Plotly or Tkinter for real-time dashboard
+- FastAPI (optional) for local dashboard server
+
+## Architecture
+```
+capture/
+  └── WebcamCapture           # OpenCV camera loop, frame normalization
+  └── PrivacyFilter           # ensure no raw frames are persisted to disk
+tracking/
+  └── FaceMeshExtractor       # MediaPipe 468-landmark face mesh
+  └── HeadPoseEstimator       # pitch/yaw/roll from facial landmarks (PnP solver)
+  └── GazeEstimator           # gaze direction from iris landmarks or L2CS-Net
+  └── BlinkDetector           # blink rate and duration (EAR metric)
+state_estimation/
+  └── AttentionClassifier     # multi-feature → attention state (focused/drifting/absent)
+  └── TemporalSmoother        # EMA smoothing on raw frame predictions
+  └── DriftEventDetector      # sustained drift detection with configurable threshold
+session/
+  └── SessionTracker          # session start/stop, attention timeline recording
+  └── SessionDB               # SQLite: sessions, attention_events, frame_features
+  └── SessionReport           # post-session stats: focus time, drift frequency, heatmap
+alerts/
+  └── NudgeSystem             # gentle audio/visual nudge on drift detection
+  └── NudgeThrottler          # minimum time between nudges, configurable
+ui/
+  └── dashboard.py            # real-time attention bar + session timeline
+```
+
+## Coding Conventions
+- PRIVACY FIRST: zero raw frames persisted — only extracted features and labels
+- Head pose angles stored as (pitch, yaw, roll) float32 tuples in degrees
+- Gaze direction as unit vector (gaze_x, gaze_y, gaze_z) in camera space
+- Attention states: "focused", "drifting", "absent" — no ambiguous labels
+- EAR (Eye Aspect Ratio) for blink: threshold at 0.25 for closed eye detection
+- All frame processing functions are stateless — session state tracked separately
+- Use dataclasses: FrameFeatures, AttentionEvent, SessionRecord, DriftAlert
+- Type hints everywhere
+- Inference pipeline must run under 33ms per frame to maintain 30fps
+
+## ML-Specific Rules
+- Input features per frame: head yaw, head pitch, gaze_x, gaze_y, blink flag, face visibility confidence
+- Do not use gaze alone — head pose + gaze together are more reliable
+- Face visibility confidence: if MediaPipe confidence < 0.7, mark frame as "absent" (face not visible)
+- Attention classifier: lightweight MLP or SVM — not a transformer (latency constraint)
+- Temporal model: use a sliding window of 30 frames (1 second at 30fps) as input, not single frames
+- Drift event = sustained drifting state for > N consecutive seconds (default 5s, configurable)
+- Calibration: first 30 seconds of session captures "focused" baseline gaze and head pose ranges per user
+
+## Head Pose Thresholds (Configurable)
+- Yaw > ±25 degrees: looking away from screen
+- Pitch > +20 degrees: looking up (ceiling); < -30 degrees: looking down (phone)
+- Roll is informational only — not used for attention classification
+- All thresholds stored in config, not hardcoded
+
+## Privacy Rules (Non-Negotiable)
+- No video recording of any kind
+- No frames written to disk — features only
+- Webcam stream processed in memory, discarded per frame
+- User can pause tracking at any time — hard pause, not soft
+- Session data stored locally only, deletable on demand
+- README must document exactly what is captured
+
+## What to Avoid
+- Do not use face recognition or identity detection — this is not a surveillance tool
+- Do not alert on every single drift frame — throttle nudges aggressively
+- Do not classify attention from a single frame — always use temporal window
+- No cloud dependency — all inference runs locally
+- Do not mistake head-down reading posture for distraction — calibrate pitch baseline per user
+- Do not log session data without explicit user consent flow on first launch
+
+## Nudge Design Rules
+- Nudges must be non-intrusive: soft chime or subtle screen border flash
+- No pop-ups or interruptions that break flow more than drift already did
+- Nudge cooldown: minimum 3 minutes between nudges (configurable)
+- After 3 nudges without recovery, offer a break suggestion instead
+
+## File Naming
+- snake_case everywhere
+- Sessions: sessions/{user_id}/{session_id}.db
+- Session report: reports/{session_id}_{timestamp}.json
+- Model weights: models/attention_classifier_v{version}.pt
+
+## Key Metrics to Track
+- Frame processing latency (target under 33ms)
+- Attention state classification accuracy vs. manual labels
+- Drift detection recall (what fraction of actual drift episodes are caught)
+- False positive rate (nudges during confirmed focused periods)
+- Focus time percentage per session

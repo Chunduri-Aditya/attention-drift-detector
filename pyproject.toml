@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "attention-drift-detector"
+version = "0.1.0"
+description = "Webcam-based attention monitoring tool for deep work sessions (local-only, privacy-first)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+  { name = "Your Name", email = "you@example.com" },
+]
+dependencies = [
+  "numpy>=1.26.0,<2.0.0",
+  "opencv-python>=4.9.0.80",
+  "mediapipe>=0.10.0",
+  "torch>=2.2.0",
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "plotly>=5.20.0",
+  "pydantic>=2.6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "mypy>=1.8.0",
+  "black>=24.0.0",
+  "ruff>=0.3.0",
+]
+
+[project.scripts]
+attention-drift-detector = "attention_drift_detector.cli.main:app"
+
+[tool.setuptools]
+packages = ["attention_drift_detector"]
+
