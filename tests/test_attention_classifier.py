@@ -37,6 +37,20 @@ def clf() -> AttentionClassifier:
     return AttentionClassifier(config=AppConfig())
 
 
+class TestDefaultIsRuleBased:
+    """The rule-based path is the shipped, supported classifier. If the default
+    flips back to ML, every test in this file silently starts exercising the
+    trained model instead — so pin the invariant explicitly.
+    """
+
+    def test_default_construction_loads_no_ml_model(self) -> None:
+        assert AttentionClassifier(config=AppConfig())._ml_model is None
+
+    def test_default_predictions_are_tagged_rule(self, clf: AttentionClassifier) -> None:
+        event = clf.predict(_make_features(pitch=0.0, yaw=0.0))
+        assert event.source == "rule"
+
+
 class TestAbsent:
     def test_low_visibility_returns_absent(self, clf: AttentionClassifier) -> None:
         features = _make_features(face_visibility=0.2)
