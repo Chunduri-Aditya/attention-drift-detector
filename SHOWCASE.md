@@ -8,7 +8,7 @@ A local, privacy-first webcam tool that tracks your attention during deep work. 
 
 No video is recorded. No raw frame touches disk. Only derived numbers (head angles, gaze vectors) and state labels are stored, in a local SQLite file.
 
-The design commitment: **rule-based classification over a trained model.** The classifier is a face-visibility gate plus drift votes across yaw, pitch, and gaze offset, with an optional 30-second calibration window that recentres the thresholds on your neutral pose. It is transparent, needs no training data, and is what all 50 unit tests exercise.
+The design commitment: **rule-based classification over a trained model.** The classifier is a face-visibility gate plus drift votes across yaw, pitch, and gaze offset, with an optional 30-second calibration window that recentres the thresholds on your neutral pose. It is transparent, needs no training data, and is what all 52 unit tests exercise.
 
 ## Demo (no webcam, no MediaPipe)
 

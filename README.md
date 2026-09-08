@@ -73,7 +73,7 @@ Options:
 The shipped and tested classifier is **rule-based**: face-visibility gate, then
 drift votes across head yaw/pitch and gaze offset, with an optional 30-second
 personal calibration window that recentres the thresholds on your neutral pose.
-This is the default and the path all 50 unit tests exercise.
+This is the default and the path all 52 unit tests exercise.
 
 A trained-model path also exists (`--use-ml`): `models/trainer.py` fits a
 RandomForest / MLP on `--collect`ed CSV data, `models/mlp_classifier.py` serves
@@ -91,7 +91,7 @@ pip install -e '.[dev]'
 python -m pytest tests/ -v
 ```
 
-50 tests across 5 modules — runs in under 1 second. No webcam or network required.
+52 tests across 5 modules — runs in under 1 second. No webcam or network required.
 
 ```
 tests/test_attention_classifier.py    (17 tests)
@@ -148,7 +148,7 @@ attention_drift_detector/
   api/              # FastAPI app and session routes
   config/           # All thresholds and settings in one place
   common/           # Shared types and enums
-tests/              # 50 pytest-compatible unit tests
+tests/              # 52 pytest-compatible unit tests
 reports/            # Generated HTML session reports
 sessions/           # SQLite database (attention_sessions.db)
 ```
