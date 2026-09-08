@@ -32,11 +32,11 @@ Live with a webcam: `python -m attention_drift_detector.cli.main realtime --user
 python -m pytest tests/ -v
 ```
 
-Last run 2026-09-08: **50 passed** in 0.1 s. No webcam, no network.
+Last run 2026-09-08: **52 passed** in 0.1 s. No webcam, no network.
 
 | File | Tests | Covers |
 |---|---|---|
-| `test_attention_classifier.py` | 15 | rule-based state logic on every drift axis, confidence scaling, absent gate |
+| `test_attention_classifier.py` | 17 | rule-based state logic on every drift axis, confidence scaling, absent gate |
 | `test_session_tracker.py` | 10 | session lifecycle, focus ratio, SQLite persistence |
 | `test_nudge_throttler.py` | 9 | nudge cooldown, max-consecutive cap |
 | `test_drift_event_detector.py` | 8 | sustained-drift threshold, event boundaries |

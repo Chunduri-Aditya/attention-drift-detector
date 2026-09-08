@@ -94,7 +94,7 @@ python -m pytest tests/ -v
 50 tests across 5 modules — runs in under 1 second. No webcam or network required.
 
 ```
-tests/test_attention_classifier.py    (15 tests)
+tests/test_attention_classifier.py    (17 tests)
 tests/test_nudge_throttler.py         (9 tests)
 tests/test_session_tracker.py         (10 tests)
 tests/test_drift_event_detector.py    (8 tests)
