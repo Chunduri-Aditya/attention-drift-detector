@@ -44,6 +44,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Save labeled FrameFeatures to CSV for ML training.",
     )
     realtime.add_argument(
+        "--use-ml", action="store_true",
+        help="Opt into the trained model when one is present (default: rule-based classifier).",
+    )
+    realtime.add_argument(
         "--serve-dashboard", action="store_true",
         help="Boot the live web dashboard in the background (http://127.0.0.1:8765/).",
     )

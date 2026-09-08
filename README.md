@@ -55,29 +55,50 @@ When you quit, two things happen automatically:
 python -m attention_drift_detector.cli.main realtime [OPTIONS]
 
 Options:
-  --user-id TEXT        Local namespace for your sessions (default: default_user)
-  --max-seconds INT     Auto-stop after N seconds (useful for testing)
-  --no-preview          Disable the OpenCV overlay window (headless mode)
-  --dummy               Synthetic frames — no webcam or MediaPipe required
+  --user-id TEXT           Local namespace for your sessions (default: default_user)
+  --max-seconds INT        Auto-stop after N seconds (useful for testing)
+  --no-preview             Disable the OpenCV overlay window (headless mode)
+  --dummy                  Synthetic frames — no webcam or MediaPipe required
+  --no-calibrate           Skip the personal calibration window (use static thresholds)
+  --calibration-seconds F  Length of the calibration window (default: 30)
+  --collect                Save labeled FrameFeatures to CSV for ML training
+  --use-ml                 Opt into the trained model when one is present (default: rule-based)
+  --serve-dashboard        Boot the live web dashboard in the background
 ```
+
+---
+
+## Classifier
+
+The shipped and tested classifier is **rule-based**: face-visibility gate, then
+drift votes across head yaw/pitch and gaze offset, with an optional 30-second
+personal calibration window that recentres the thresholds on your neutral pose.
+This is the default and the path all 50 unit tests exercise.
+
+A trained-model path also exists (`--use-ml`): `models/trainer.py` fits a
+RandomForest / MLP on `--collect`ed CSV data, `models/mlp_classifier.py` serves
+it. It is **opt-in and unverified against the current feature extractor** — no
+model ships in the repo (`models_store/` is Git ignored), and `--use-ml` falls
+back to rule-based when no model is present. Treat it as wiring, not a result.
+Install its deps with `pip install -e '.[ml]'`.
 
 ---
 
 ## Running the tests
 
 ```bash
-pip install pytest
+pip install -e '.[dev]'
 python -m pytest tests/ -v
 ```
 
 50 tests across 5 modules — runs in under 1 second. No webcam or network required.
 
 ```
-tests/test_attention_classifier.py    (14 tests)
-tests/test_temporal_smoother.py       (8 tests)
-tests/test_drift_event_detector.py    (8 tests)
+tests/test_attention_classifier.py    (15 tests)
 tests/test_nudge_throttler.py         (9 tests)
 tests/test_session_tracker.py         (10 tests)
+tests/test_drift_event_detector.py    (8 tests)
+tests/test_temporal_smoother.py       (8 tests)
 ```
 
 ---
@@ -178,10 +199,15 @@ pip install "numpy<2.0"
 
 ## What's next
 
-The `AttentionClassifier` is currently rule-based and explicitly designed as a drop-in placeholder. The interface is already defined — replacing it with a trained MLP requires:
+The trained-model path is scaffolded end to end — `--collect` writes labeled
+`FrameFeatures` CSVs, `models/trainer.py` fits and cross-validates a
+RandomForest / MLP, `models/mlp_classifier.py` serves it behind `--use-ml`, and
+the pipeline swaps classifiers without any other change. What it still needs to
+become a real result rather than wiring:
 
-1. Running real sessions to collect labeled `FrameFeatures` data (stored in SQLite)
-2. Training a lightweight MLP on `(yaw, pitch, gaze_x, gaze_y, blink, face_visibility)` → `AttentionState`
-3. Swapping the classifier without changing anything else in the pipeline
-
-The storage layer and session report infrastructure built here generate exactly the training data needed for that upgrade.
+1. A labeled dataset collected across varied lighting, users, and genuine drift —
+   not one sitting
+2. A held-out evaluation of the trained model against the rule-based baseline on
+   that data, reported per state
+3. Pinning the model's feature contract to the extractor so a schema change can't
+   silently invalidate a saved model

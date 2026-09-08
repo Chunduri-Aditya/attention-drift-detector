@@ -125,6 +125,7 @@ def run_realtime_pipeline(
     calibrate: bool = True,
     calibration_seconds: float = 30.0,
     collect: bool = False,
+    use_ml: bool = False,
     serve_dashboard: bool = False,
     dashboard_port: int = 8765,
 ) -> None:
@@ -137,6 +138,7 @@ def run_realtime_pipeline(
     calibrate:           Run a personal calibration window at session start.
     calibration_seconds: Length of the calibration window (default 30s).
     collect:             Save labeled FrameFeatures to CSV for ML training.
+    use_ml:              Use the trained model when one is present; False forces rule-based.
     save_session:        Persist session metadata and events to SQLite.
     generate_report:     Write an HTML report after the session ends.
     serve_dashboard:     Boot the web dashboard in a background thread.
@@ -147,7 +149,7 @@ def run_realtime_pipeline(
 
     window_frames = int(settings.drift.temporal_window_s * settings.target_fps)
     smoother = TemporalSmoother(window_size=max(1, window_frames))
-    classifier = AttentionClassifier(config=settings)
+    classifier = AttentionClassifier(config=settings, use_ml=use_ml)
     drift_detector = DriftEventDetector(
         drift_seconds_threshold=settings.drift.drift_seconds_threshold,
         fps=settings.target_fps,

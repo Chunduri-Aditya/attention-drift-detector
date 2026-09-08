@@ -13,20 +13,26 @@ class AttentionClassifier:
 
     ML model is loaded once at construction time. Rule-based fallback supports
     optional personal calibration for adaptive per-user thresholds.
+
+    Rule-based is the default and the supported path. Set use_ml=True (CLI:
+    `realtime --use-ml`) to opt into the trained model when one is present.
     """
 
-    def __init__(self, config: AppConfig, use_ml: bool = True) -> None:
+    def __init__(self, config: AppConfig, use_ml: bool = False) -> None:
         self._config = config
         self._calibration: CalibrationResult | None = None
         self._ml_model = None
         if use_ml:
             try:
                 from ..models.mlp_classifier import MLAttentionClassifier
+            except ImportError as exc:
+                # `ml` extra not installed (`pip install -e '.[ml]'`); use rule-based.
+                print(f"[classifier] ML path unavailable ({exc}); using rule-based.")
+            else:
+                # load() handles a missing/unloadable model itself and returns None.
                 self._ml_model = MLAttentionClassifier.load()
                 if self._ml_model is not None:
                     print(f"[classifier] ML model loaded from {self._ml_model.model_path.name}")
-            except Exception:  # noqa: BLE001
-                pass  # silently fall through to rule-based
 
     def apply_calibration(self, result: CalibrationResult) -> None:
         """Hot-swap in personal thresholds mid-session (called after calibration)."""

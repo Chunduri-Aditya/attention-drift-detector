@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [
-  { name = "Your Name", email = "you@example.com" },
+  { name = "Aditya Chunduri", email = "aditya2210.a1@gmail.com" },
 ]
 dependencies = [
   "numpy>=1.26.0,<2.0.0",
@@ -24,6 +24,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Optional trained-model path. The shipped default is the rule-based classifier;
+# `train` and the ML classifier need these.
+ml = [
+  "scikit-learn>=1.4.0",
+  "joblib>=1.3.0",
+]
 dev = [
   "pytest>=8.0.0",
   "mypy>=1.8.0",

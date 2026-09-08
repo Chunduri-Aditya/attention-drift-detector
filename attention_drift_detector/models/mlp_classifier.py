@@ -73,13 +73,17 @@ class MLAttentionClassifier:
         from ..common.enums import AttentionState
         from ..common.types import AttentionEvent
 
+        pitch, yaw, roll = features.head_angles_deg
+        gaze_x, gaze_y, gaze_z = features.gaze_vector
+
+        # Order must match FEATURE_ORDER / the trained model's feature_cols.
         vec = np.array([[
-            features.yaw,
-            features.pitch,
-            features.roll,
-            features.gaze_x,
-            features.gaze_y,
-            features.gaze_z,
+            yaw,
+            pitch,
+            roll,
+            gaze_x,
+            gaze_y,
+            gaze_z,
             float(features.blink),
             features.face_visibility,
         ]], dtype=np.float32)

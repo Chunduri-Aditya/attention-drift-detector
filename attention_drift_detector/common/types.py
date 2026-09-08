@@ -30,6 +30,7 @@ class AttentionEvent:
     timestamp: datetime
     state: AttentionState
     confidence: float
+    source: str = "rule"  # "rule" (calibrated thresholds) or "ml" (trained model)
 
 
 @dataclass(slots=True)
